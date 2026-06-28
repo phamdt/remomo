@@ -36,4 +36,15 @@ object InputValidation {
         }
         return null
     }
+
+    /** Validates user-facing external links (e.g. PR URLs from the API). */
+    fun validateExternalUrl(url: String): String? {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) return "URL is required"
+        val lower = trimmed.lowercase()
+        if (!lower.startsWith("https://")) return "Only HTTPS links can be opened"
+        val blockedSchemes = listOf("javascript:", "data:", "file:", "intent:")
+        if (blockedSchemes.any { lower.contains(it) }) return "Invalid URL"
+        return null
+    }
 }

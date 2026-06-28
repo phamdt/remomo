@@ -40,4 +40,12 @@ class InputValidationTest {
             InputValidation.validatePrompt(longPrompt),
         )
     }
+
+    @Test
+    fun rejectsDataUrlsForExternalLinks() {
+        assertEquals(
+            "Invalid URL",
+            InputValidation.validateExternalUrl("https://x.com/redirect?u=data:text/html,evil"),
+        )
+    }
 }
