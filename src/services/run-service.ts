@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import type { CreateRunRequest } from "../api-schema.js";
+import type { ContinueRunRequest, CreateRunRequest } from "../api-schema.js";
 import { getRepoById, getWorkspaceById, loadWorkspaces } from "../config/loader.js";
 import { RunDatabase } from "../db/client.js";
 import { agentRunner, type AgentRunner } from "../agent/runner.js";
@@ -35,6 +35,7 @@ import {
 import { clientErrorMessage } from "../security/errors.js";
 import { getMaxConcurrentRuns, getRunTimeoutMs } from "../security/limits.js";
 import type { AppSecrets } from "../security/secrets.js";
+import { resolveBaseRef } from "../run-options.js";
 import { runEventBus } from "./event-bus.js";
 import type { RunRecord, RunRepoRow, RunStatus, RunSummary } from "../types.js";
 
@@ -54,6 +55,7 @@ export type RunServiceDeps = {
 };
 
 const TERMINAL_STATUSES: RunStatus[] = ["completed", "failed", "cancelled"];
+const APPLY_CONTINUE_DEFAULT_PROMPT = "Apply the plan.";
 
 export class RunService {
   private readonly db: RunDatabase;
@@ -85,7 +87,15 @@ export class RunService {
         path: r.path,
       })),
       defaultPromptContext: w.defaultPromptContext,
+      runOptions: w.runOptions,
     }));
+  }
+
+  listSummaries(options: { limit: number; workspaceId?: string }): RunSummary[] {
+    return this.db
+      .listRuns(options)
+      .map((run) => this.getSummary(run.id))
+      .filter((summary): summary is RunSummary => summary !== null);
   }
 
   createRun(request: CreateRunRequest, bearerToken: string): { id: string } {
@@ -96,6 +106,7 @@ export class RunService {
     this.assertApplyToken(request.mode, bearerToken);
 
     const workspace = getWorkspaceById(request.workspaceId, this.configDir);
+    const baseRef = resolveBaseRef(workspace, request);
     const id = `run_${Date.now()}_${randomBytes(4).toString("hex")}`;
     const now = new Date().toISOString();
 
@@ -108,7 +119,7 @@ export class RunService {
         repoId: ref.repoId,
         role: ref.role,
         path: ref.path,
-        baseRef: request.baseRef ?? repo.defaultBranch,
+        baseRef: baseRef ?? repo.defaultBranch,
         branch: null,
         prUrl: null,
       };
@@ -130,15 +141,27 @@ export class RunService {
     return { id };
   }
 
-  continueRun(id: string, prompt: string, bearerToken: string): void {
+  continueRun(id: string, request: ContinueRunRequest, bearerToken: string): void {
     const run = this.requireRun(id);
-    this.assertApplyToken(run.mode, bearerToken);
+    const effectiveMode = request.mode ?? run.mode;
+    this.assertApplyToken(effectiveMode, bearerToken);
 
     if (this.active.has(id) || run.status === "running") {
       throw new RunAlreadyActiveError();
     }
     if (!TERMINAL_STATUSES.includes(run.status)) {
       throw new Error(`Cannot continue run in status ${run.status}`);
+    }
+
+    const prompt =
+      request.prompt ??
+      (request.mode === "apply" ? APPLY_CONTINUE_DEFAULT_PROMPT : undefined);
+    if (!prompt) {
+      throw new Error("prompt is required unless mode is apply");
+    }
+
+    if (request.mode && request.mode !== run.mode) {
+      this.db.updateMode(id, request.mode, new Date().toISOString());
     }
 
     const workspace = getWorkspaceById(run.workspaceId, this.configDir);
@@ -334,7 +357,15 @@ export class RunService {
   }
 
   private endCompleted(runId: string): void {
+    const run = this.requireRun(runId);
     this.finalizeRun(runId, "completed");
+    if (run.mode === "plan_only") {
+      runEventBus.publish(
+        runId,
+        { type: "plan_ready" },
+        runEventsPath(runId),
+      );
+    }
     runEventBus.publish(
       runId,
       { type: "result", ok: true },

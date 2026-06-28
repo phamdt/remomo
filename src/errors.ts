@@ -43,12 +43,24 @@ export class RunAlreadyActiveError extends Error {
   }
 }
 
+export class InvalidRunOptionsError extends Error {
+  readonly code = "INVALID_OPTIONS" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidRunOptionsError";
+  }
+}
+
 export function httpStatusForError(error: unknown): 400 | 403 | 404 {
   if (error instanceof ApplyTokenRequiredError) {
     return 403;
   }
   if (error instanceof RunNotFoundError) {
     return 404;
+  }
+  if (error instanceof InvalidRunOptionsError) {
+    return 400;
   }
   return 400;
 }

@@ -56,6 +56,12 @@ type Workspace = {
   name: string;
   repos: WorkspaceRepo[];
   defaultPromptContext?: string;
+  runOptions?: Array<{
+    key: string;
+    label: string;
+    required?: boolean;
+    choices: Array<{ value: string; label: string }>;
+  }>;
 };
 
 type RunMode = "plan_only" | "apply";
@@ -64,8 +70,8 @@ type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 - **Repo** — one Git remote
 - **Workspace** — curated bundle of repos (mobile picks `workspaceId` only)
-- **Run** — one agent task against a workspace
-- **Conversation** — SDK-managed state under `cursor-state/`; not in SQLite
+- **Run** — one agent task against a workspace (HTTP API term: `/runs`)
+- **Conversation** — SDK-managed state under `cursor-state/`; not in SQLite. Mobile UI may label runs as *conversations* while calling the same `/runs` API.
 
 ## Server config
 
@@ -120,6 +126,12 @@ type CreateRunRequest = {
   mode: RunMode;
   prompt: string;
   baseRef?: string; // optional override per repo default
+  options?: Record<string, string>; // server-defined keys, e.g. { baseRef: "main" }
+};
+
+type ContinueRunRequest = {
+  prompt?: string; // required unless mode is apply
+  mode?: RunMode; // e.g. upgrade plan_only → apply after review
 };
 
 type RunSummary = {
@@ -143,6 +155,7 @@ type SseEvent =
   | { type: "status"; status: RunStatus }
   | { type: "log"; message: string }
   | { type: "tool"; name: string; summary?: string }
+  | { type: "plan_ready" }
   | { type: "result"; ok: boolean }
   | { type: "error"; message: string };
 ```
@@ -151,11 +164,13 @@ type SseEvent =
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/workspaces` | List server-defined workspaces |
+| `GET` | `/health` | Liveness check → `{ ok: true }` |
+| `GET` | `/workspaces` | List server-defined workspaces (includes optional `runOptions`) |
+| `GET` | `/runs` | List recent runs → `{ runs: RunSummary[] }` (`limit`, `workspaceId` query) |
 | `POST` | `/runs` | Create run (`CreateRunRequest`) → `{ id }` |
 | `GET` | `/runs/{id}` | `RunSummary` |
 | `GET` | `/runs/{id}/events` | SSE stream of `SseEvent` |
-| `POST` | `/runs/{id}/continue` | `{ prompt: string }` — uses on-disk Cursor state |
+| `POST` | `/runs/{id}/continue` | `ContinueRunRequest` — resumes on-disk Cursor conversation |
 | `POST` | `/runs/{id}/cancel` | Cancel SDK + child processes |
 
 ## On-disk layout
@@ -217,7 +232,9 @@ type SseEvent =
 6. Push branches and open PRs for repos with changes.
 7. Set terminal status (`completed` | `failed` | `cancelled`).
 
-`POST /continue` resumes from `cursor-state/` without re-cloning. `POST /cancel` aborts the active SDK session and marks `cancelled`.
+`POST /continue` resumes from `cursor-state/` without re-cloning. Pass `{ mode: "apply" }` (optional prompt) to apply after a `plan_only` run completes; omit prompt to use the server default apply instruction. Pass `{ prompt }` to revise a plan while keeping the same run id. `POST /cancel` aborts the active SDK session and marks `cancelled`.
+
+When a `plan_only` run completes, the SSE stream emits `plan_ready` before the terminal `result` event.
 
 ## Security & constraints
 
@@ -231,7 +248,7 @@ type SseEvent =
 - `events.jsonl` is append-only for audit; treat `cursor-state/` as sensitive.
 - Secrets (`REMOTE_AGENT_TOKEN`, `CURSOR_API_KEY`, `GITHUB_TOKEN`) are scrubbed from `process.env` at startup; git/gh receive tokens via isolated env only.
 - Optional `REMOTE_AGENT_APPLY_TOKEN` restricts `mode: "apply"` runs to a separate bearer token.
-- Client `baseRef` must match `^[a-zA-Z0-9/._-]+$`.
+- Client `baseRef` and `options.baseRef` must match `^[a-zA-Z0-9/._-]+$` and align with workspace `runOptions` when configured.
 - SSE error events use generic messages; details are logged server-side only.
 - `SSE_MAX_WAIT_MS` caps how long event streams wait for terminal status (default: run timeout + 5 min).
 - `resultPath` in summaries is an opaque handle (`runs/{id}/result`), not an absolute path.

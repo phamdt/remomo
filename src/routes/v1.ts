@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import {
   continueRunRequestSchema,
   createRunRequestSchema,
+  listRunsQuerySchema,
 } from "../api-schema.js";
 import { httpStatusForError } from "../errors.js";
 import { bearerAuth, extractBearerToken } from "../middleware/auth.js";
@@ -18,6 +19,19 @@ export function createV1Routes(runService: RunService, token: string) {
 
   app.get("/workspaces", (c) => {
     return c.json({ workspaces: runService.listWorkspaces() });
+  });
+
+  app.get("/health", (c) => c.json({ ok: true }));
+
+  app.get("/runs", (c) => {
+    const query = listRunsQuerySchema.safeParse({
+      limit: c.req.query("limit"),
+      workspaceId: c.req.query("workspaceId"),
+    });
+    if (!query.success) {
+      return c.json({ error: "Invalid query", details: query.error.flatten() }, 400);
+    }
+    return c.json({ runs: runService.listSummaries(query.data) });
   });
 
   app.post("/runs", async (c) => {
@@ -106,7 +120,7 @@ export function createV1Routes(runService: RunService, token: string) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     try {
-      runService.continueRun(runId, body.data.prompt, bearerToken);
+      runService.continueRun(runId, body.data, bearerToken);
       return c.json({ ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to continue run";

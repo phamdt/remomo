@@ -83,4 +83,52 @@ describe("RunDatabase", () => {
     expect(db.listRunRepos("run_2")[0]?.prUrl).toBe("https://example.com/pr/1");
     db.close();
   });
+
+  it("lists runs newest first with optional workspace filter", () => {
+    const db = tempDb();
+    const older = "2026-01-01T00:00:00.000Z";
+    const newer = "2026-01-02T00:00:00.000Z";
+    const insert = (id: string, workspaceId: string, updatedAt: string) => {
+      db.insertRun(
+        {
+          id,
+          workspaceId,
+          status: "completed",
+          mode: "plan_only",
+          runPath: `/tmp/${id}`,
+          cursorStatePath: `/tmp/${id}/cursor-state`,
+          createdAt: older,
+          updatedAt,
+        },
+        [
+          {
+            repoId: "demo-api",
+            role: "api",
+            path: "api",
+            baseRef: "main",
+            branch: null,
+            prUrl: null,
+          },
+        ],
+      );
+    };
+
+    insert("run_old", "ws-a", older);
+    insert("run_new", "ws-a", newer);
+    insert("run_other", "ws-b", newer);
+
+    expect(db.listRuns({ limit: 10 }).map((run) => run.id)).toEqual([
+      "run_new",
+      "run_other",
+      "run_old",
+    ]);
+    expect(db.listRuns({ limit: 10, workspaceId: "ws-a" }).map((run) => run.id)).toEqual([
+      "run_new",
+      "run_old",
+    ]);
+
+    db.updateMode("run_old", "apply", newer);
+    expect(db.getRun("run_old")?.mode).toBe("apply");
+    db.close();
+  });
 });

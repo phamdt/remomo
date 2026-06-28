@@ -24,11 +24,24 @@ export const workspaceRepoSchema = z.object({
   path: workspaceRepoPathSchema,
 });
 
+export const runOptionChoiceSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+});
+
+export const runOptionGroupSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean().default(false),
+  choices: z.array(runOptionChoiceSchema).min(1),
+});
+
 export const workspaceSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   repos: z.array(workspaceRepoSchema).min(1),
   defaultPromptContext: z.string().optional(),
+  runOptions: z.array(runOptionGroupSchema).optional(),
 });
 
 export const reposConfigSchema = z.array(repoSchema).min(1);

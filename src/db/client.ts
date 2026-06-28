@@ -97,6 +97,38 @@ export class RunDatabase {
       .run(status, updatedAt, id);
   }
 
+  updateMode(id: string, mode: RunMode, updatedAt: string): void {
+    this.db
+      .prepare(`UPDATE runs SET mode = ?, updated_at = ? WHERE id = ?`)
+      .run(mode, updatedAt, id);
+  }
+
+  listRuns(options: { limit: number; workspaceId?: string }): RunRecord[] {
+    const limit = options.limit;
+    if (options.workspaceId) {
+      return this.db
+        .prepare(
+          `SELECT id, workspace_id AS workspaceId, status, mode, run_path AS runPath,
+                  cursor_state_path AS cursorStatePath, created_at AS createdAt, updated_at AS updatedAt
+           FROM runs
+           WHERE workspace_id = ?
+           ORDER BY updated_at DESC
+           LIMIT ?`,
+        )
+        .all(options.workspaceId, limit) as RunRecord[];
+    }
+
+    return this.db
+      .prepare(
+        `SELECT id, workspace_id AS workspaceId, status, mode, run_path AS runPath,
+                cursor_state_path AS cursorStatePath, created_at AS createdAt, updated_at AS updatedAt
+         FROM runs
+         ORDER BY updated_at DESC
+         LIMIT ?`,
+      )
+      .all(limit) as RunRecord[];
+  }
+
   updateRunRepoBranch(
     runId: string,
     repoId: string,

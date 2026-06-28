@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createV1Routes } from "../src/routes/v1.js";
 import type { RunService } from "../src/services/run-service.js";
 
@@ -9,6 +9,17 @@ function mockRunService(overrides: Partial<RunService> = {}): RunService {
         id: "demo-workspace",
         name: "Demo",
         repos: [{ repoId: "demo-api", role: "api", path: "api" }],
+      },
+    ],
+    listSummaries: () => [
+      {
+        id: "run_123",
+        workspaceId: "demo-workspace",
+        status: "completed",
+        mode: "plan_only",
+        repos: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
       },
     ],
     createRun: () => ({ id: "run_123" }),
@@ -84,5 +95,36 @@ describe("v1 routes", () => {
       }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("lists runs", async () => {
+    const app = createV1Routes(mockRunService(), token);
+    const res = await app.request("/runs?limit=10", { headers: auth });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: Array<{ id: string }> };
+    expect(body.runs[0]?.id).toBe("run_123");
+  });
+
+  it("reports v1 health", async () => {
+    const app = createV1Routes(mockRunService(), token);
+    const res = await app.request("/health", { headers: auth });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("continues a run with apply mode", async () => {
+    const continueRun = vi.fn();
+    const app = createV1Routes(mockRunService({ continueRun }), token);
+    const res = await app.request("/runs/run_123/continue", {
+      method: "POST",
+      headers: { ...auth, "content-type": "application/json" },
+      body: JSON.stringify({ mode: "apply" }),
+    });
+    expect(res.status).toBe(200);
+    expect(continueRun).toHaveBeenCalledWith(
+      "run_123",
+      { mode: "apply" },
+      "test-token",
+    );
   });
 });

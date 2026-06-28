@@ -135,7 +135,7 @@ describe("RunService", () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(() => service.continueRun(id, "second", "read-token")).toThrow(
+    expect(() => service.continueRun(id, { prompt: "second" }, "read-token")).toThrow(
       ApplyTokenRequiredError,
     );
   });
@@ -214,5 +214,71 @@ describe("RunService", () => {
   it("cancel on unknown run throws not found", () => {
     const { service } = setup();
     expect(() => service.cancelRun("run_missing")).toThrow(RunNotFoundError);
+  });
+
+  it("continues plan_only run with apply mode using default prompt", async () => {
+    const prompts: string[] = [];
+    const { service } = setup({
+      runner: mockRunner(async (options) => {
+        prompts.push(options.prompt);
+        return { ok: true, resultText: "ok" };
+      }),
+    });
+
+    vi.spyOn(
+      service as unknown as { prepareWorktrees: () => Promise<void> },
+      "prepareWorktrees",
+    ).mockResolvedValue(undefined);
+    vi.spyOn(
+      service as unknown as { publishChanges: () => Promise<void> },
+      "publishChanges",
+    ).mockResolvedValue(undefined);
+
+    const { id } = service.createRun(
+      {
+        workspaceId: "demo-workspace",
+        mode: "plan_only",
+        prompt: "draft a plan",
+      },
+      "read-token",
+    );
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(service.getSummary(id)?.status).toBe("completed");
+
+    service.continueRun(id, { mode: "apply" }, "apply-token");
+    await new Promise((r) => setTimeout(r, 50));
+
+    const summary = service.getSummary(id);
+    expect(summary?.mode).toBe("apply");
+    expect(summary?.status).toBe("completed");
+    expect(prompts).toEqual(["draft a plan", "Apply the plan."]);
+  });
+
+  it("lists recent run summaries", async () => {
+    const { service } = setup({
+      runner: mockRunner(async () => ({ ok: true, resultText: "ok" })),
+    });
+
+    vi.spyOn(
+      service as unknown as { prepareWorktrees: () => Promise<void> },
+      "prepareWorktrees",
+    ).mockResolvedValue(undefined);
+
+    const first = service.createRun(
+      { workspaceId: "demo-workspace", mode: "plan_only", prompt: "one" },
+      "read-token",
+    );
+    const second = service.createRun(
+      { workspaceId: "demo-workspace", mode: "plan_only", prompt: "two" },
+      "read-token",
+    );
+
+    await new Promise((r) => setTimeout(r, 80));
+
+    const runs = service.listSummaries({ limit: 10 });
+    expect(runs.map((run) => run.id)).toEqual(
+      expect.arrayContaining([first.id, second.id]),
+    );
   });
 });

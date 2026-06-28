@@ -10,6 +10,7 @@ export type SseEvent =
   | { type: "status"; status: RunStatus }
   | { type: "log"; message: string }
   | { type: "tool"; name: string; summary?: string }
+  | { type: "plan_ready" }
   | { type: "result"; ok: boolean }
   | { type: "error"; message: string };
 

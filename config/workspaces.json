@@ -5,6 +5,17 @@
     "repos": [
       { "repoId": "demo-api", "role": "api", "path": "api" }
     ],
-    "defaultPromptContext": "The repository lives under api/."
+    "defaultPromptContext": "The repository lives under api/.",
+    "runOptions": [
+      {
+        "key": "baseRef",
+        "label": "Base branch",
+        "required": false,
+        "choices": [
+          { "value": "main", "label": "main" },
+          { "value": "develop", "label": "develop" }
+        ]
+      }
+    ]
   }
 ]
