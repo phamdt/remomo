@@ -6,16 +6,21 @@ import {
   listRunsQuerySchema,
 } from "../api-schema.js";
 import { httpStatusForError } from "../errors.js";
-import { bearerAuth, extractBearerToken } from "../middleware/auth.js";
+import { bearerAuthAny, extractBearerToken } from "../middleware/auth.js";
 import { getSseMaxWaitMs } from "../security/limits.js";
 import type { RunService } from "../services/run-service.js";
 import { runEventBus } from "../services/event-bus.js";
 import type { SseEvent } from "../types.js";
 
-export function createV1Routes(runService: RunService, token: string) {
+export function createV1Routes(
+  runService: RunService,
+  token: string,
+  applyToken?: string,
+) {
   const app = new Hono();
+  const allowedTokens = applyToken ? [token, applyToken] : [token];
 
-  app.use("*", bearerAuth(token));
+  app.use("*", bearerAuthAny(allowedTokens));
 
   app.get("/workspaces", (c) => {
     return c.json({ workspaces: runService.listWorkspaces() });

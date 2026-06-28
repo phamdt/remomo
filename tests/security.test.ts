@@ -1,6 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createRunRequestSchema } from "../src/api-schema.js";
-import { safeEqualToken } from "../src/middleware/auth.js";
+import { safeEqualToken, bearerAuthAny } from "../src/middleware/auth.js";
 import { runResultHandle } from "../src/paths.js";
 import {
   clientErrorMessage,
@@ -55,6 +55,21 @@ describe("security", () => {
     expect(safeEqualToken("abc", "abc")).toBe(true);
     expect(safeEqualToken("abc", "abd")).toBe(false);
     expect(safeEqualToken("abc", "abcd")).toBe(false);
+  });
+
+  it("accepts any configured bearer token", async () => {
+    const handler = bearerAuthAny(["read-token", "apply-token"]);
+    const next = vi.fn(async () => new Response("ok"));
+    const allowed = await handler(
+      {
+        req: { header: () => "Bearer apply-token" },
+        json: (body: unknown, status?: number) =>
+          new Response(JSON.stringify(body), { status: status ?? 200 }),
+      } as never,
+      next,
+    );
+    expect(next).toHaveBeenCalled();
+    expect(allowed).toBeUndefined();
   });
 
   it("rejects invalid baseRef in create run schema", () => {

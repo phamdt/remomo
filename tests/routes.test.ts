@@ -127,4 +127,27 @@ describe("v1 routes", () => {
       "test-token",
     );
   });
+
+  it("accepts apply token on continue when configured separately", async () => {
+    const continueRun = vi.fn();
+    const app = createV1Routes(
+      mockRunService({ continueRun }),
+      "read-token",
+      "apply-token",
+    );
+    const res = await app.request("/runs/run_123/continue", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer apply-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ mode: "apply" }),
+    });
+    expect(res.status).toBe(200);
+    expect(continueRun).toHaveBeenCalledWith(
+      "run_123",
+      { mode: "apply" },
+      "apply-token",
+    );
+  });
 });

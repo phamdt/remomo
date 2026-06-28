@@ -9,7 +9,9 @@ import {
   RunNotFoundError,
   TooManyConcurrentRunsError,
 } from "../src/errors.js";
+import { runEventBus } from "../src/services/event-bus.js";
 import { RunService } from "../src/services/run-service.js";
+import type { SseEvent } from "../src/types.js";
 import type { AppSecrets } from "../src/security/secrets.js";
 
 const secrets: AppSecrets = {
@@ -280,5 +282,38 @@ describe("RunService", () => {
     expect(runs.map((run) => run.id)).toEqual(
       expect.arrayContaining([first.id, second.id]),
     );
+  });
+
+  it("emits plan_ready to live subscribers before finalizing the run", async () => {
+    const events: SseEvent[] = [];
+    const { service } = setup({
+      runner: mockRunner(async () => ({ ok: true, resultText: "ok" })),
+    });
+
+    vi.spyOn(
+      service as unknown as { prepareWorktrees: () => Promise<void> },
+      "prepareWorktrees",
+    ).mockResolvedValue(undefined);
+
+    const { id } = service.createRun(
+      {
+        workspaceId: "demo-workspace",
+        mode: "plan_only",
+        prompt: "draft a plan",
+      },
+      "read-token",
+    );
+
+    const unsubscribe = runEventBus.subscribe(id, (event) => {
+      events.push(event);
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    unsubscribe();
+
+    const types = events.map((event) => event.type);
+    expect(types).toContain("plan_ready");
+    expect(types).toContain("result");
+    expect(types.indexOf("plan_ready")).toBeLessThan(types.lastIndexOf("result"));
   });
 });

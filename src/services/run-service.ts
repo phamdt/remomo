@@ -334,16 +334,15 @@ export class RunService {
   }
 
   private endCancelled(runId: string): void {
-    this.finalizeRun(runId, "cancelled");
     runEventBus.publish(
       runId,
       { type: "result", ok: false },
       runEventsPath(runId),
     );
+    this.finalizeRun(runId, "cancelled");
   }
 
   private endFailed(runId: string, message: string): void {
-    this.finalizeRun(runId, "failed");
     runEventBus.publish(
       runId,
       { type: "error", message },
@@ -354,11 +353,11 @@ export class RunService {
       { type: "result", ok: false },
       runEventsPath(runId),
     );
+    this.finalizeRun(runId, "failed");
   }
 
   private endCompleted(runId: string): void {
     const run = this.requireRun(runId);
-    this.finalizeRun(runId, "completed");
     if (run.mode === "plan_only") {
       runEventBus.publish(
         runId,
@@ -371,6 +370,7 @@ export class RunService {
       { type: "result", ok: true },
       runEventsPath(runId),
     );
+    this.finalizeRun(runId, "completed");
   }
 
   private async prepareWorktrees(

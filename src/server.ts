@@ -11,7 +11,11 @@ export function createApp() {
   const secrets = initializeSecrets();
   const app = new Hono();
   const runService = createRunService(secrets);
-  app.route("/v1", createV1Routes(runService, secrets.remoteAgentToken));
+  app.route("/v1", createV1Routes(
+    runService,
+    secrets.remoteAgentToken,
+    secrets.remoteAgentApplyToken,
+  ));
   app.get("/health", (c) => c.json({ ok: true }));
   return app;
 }
