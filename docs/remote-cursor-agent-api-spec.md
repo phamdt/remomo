@@ -2,6 +2,8 @@
 
 TypeScript service on a GCP VM that accepts mobile requests, materializes server-defined workspaces, runs Cursor SDK agents, streams progress, and opens Git branches/PRs. Prompts are not stored in the app database; Cursor conversation state lives on disk only.
 
+**Client spec:** [Kotlin Multiplatform App Spec](./remote-cursor-agent-kmp-app-spec.md)
+
 ## Architecture
 
 ```mermaid
