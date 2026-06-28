@@ -1,6 +1,6 @@
 # Remote Cursor Agent Controller — Kotlin Multiplatform App Spec
 
-Mobile client for the [Remote Cursor Agent API](./remote-cursor-agent-api-spec.md). Lets the user pick a server-defined workspace, submit agent runs, stream progress, continue or cancel work, and open PR results. The app never discovers repos directly and never receives VM filesystem paths.
+Mobile client for the Remote Cursor Agent HTTPS API (`/v1`). Lets the user pick a server-defined workspace, submit agent runs, stream progress, continue or cancel work, and open PR results. The app never discovers repos directly and never receives VM filesystem paths.
 
 ## App boundary
 
@@ -11,7 +11,7 @@ flowchart LR
     Repo[Repository layer]
     SSE[SSE client]
   end
-  subgraph Server["TypeScript API /v1"]
+  subgraph Server["Remote Agent API /v1"]
     WS[GET /workspaces]
     CR[POST /runs]
     GS[GET /runs/id]
@@ -38,7 +38,7 @@ flowchart LR
 | `POST /v1/runs/{id}/continue` | Follow-up prompt; server resumes on-disk Cursor state |
 | `POST /v1/runs/{id}/cancel` | Abort active SDK session |
 
-Server contract details: [remote-cursor-agent-api-spec.md](./remote-cursor-agent-api-spec.md).
+All routes require `Authorization: Bearer <token>`. The server defines workspaces and repos; the app only sends `workspaceId` and prompts.
 
 ---
 
@@ -109,7 +109,7 @@ Settings ──► Workspace list ──► New run ──► Run detail ──�
 
 ## API models (shared KMP)
 
-Aligned with the [API spec](./remote-cursor-agent-api-spec.md) types section.
+Aligned with the remote agent `/v1` REST API contract.
 
 ```kotlin
 @Serializable
@@ -428,8 +428,8 @@ Android Studio on Windows is the primary IDE for this KMP client.
 
 1. Install **Android Studio** (latest stable) with Android SDK 34+.
 2. Use **JDK 17** (Embedded JBR or Temurin 17).
-3. Emulator networking: API base URL `http://10.0.2.2:<port>` maps to host `localhost` when testing against a local TypeScript API ([API Windows notes](./remote-cursor-agent-api-spec.md#windows-dev-notes)).
-4. Git for Windows is required for any local server-side work; the mobile app itself does not invoke git.
+3. Emulator networking: API base URL `http://10.0.2.2:<port>` maps to host `localhost` when testing against a local API server on the same machine.
+4. The mobile app does not invoke git; it only talks to the remote agent over HTTPS.
 5. EncryptedSharedPreferences works on emulator/API 23+; use a release build or `minSdk`-appropriate test device for production-like storage.
 6. SSE: verify on a physical device if emulator buffers streams oddly.
 
@@ -448,9 +448,3 @@ Android Studio on Windows is the primary IDE for this KMP client.
 | Compose Multiplatform iOS | After Android MVP |
 | Artifact preview | Beyond PR links |
 | Repo onboarding UI | Server-managed config only |
-
----
-
-## Related docs
-
-- [Remote Cursor Agent API Spec](./remote-cursor-agent-api-spec.md)
