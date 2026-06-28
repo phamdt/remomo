@@ -39,6 +39,7 @@ import com.remomo.agent.model.StatusTimelineEntry
 import com.remomo.agent.model.TimelineEntry
 import com.remomo.agent.model.ToolTimelineEntry
 import com.remomo.agent.ui.theme.GlassPanel
+import com.remomo.agent.validation.InputValidation
 import com.remomo.agent.viewmodel.RunDetailViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,7 +131,9 @@ fun RunDetailScreen(
                 item { Text("Results", style = MaterialTheme.typography.titleMedium) }
                 items(summary.repos, key = RunRepoDto::repoId) { repo ->
                     ResultRepoRow(repo = repo, onOpenUrl = { url ->
-                        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                        if (InputValidation.validateExternalUrl(url) == null) {
+                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                        }
                     })
                 }
             }
