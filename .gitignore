@@ -1,0 +1,21 @@
+node_modules/
+dist/
+/data/
+/runs/
+/repo-cache/
+
+# Gradle / Kotlin
+.gradle/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android
+*.apk
+*.aab
+*.hprof
