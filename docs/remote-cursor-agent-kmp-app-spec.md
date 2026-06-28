@@ -109,7 +109,7 @@ Settings ──► Workspace list ──► New run ──► Run detail ──�
 
 ## API models (shared KMP)
 
-Aligned with server types in `src/types.ts` and `src/api-schema.ts`.
+Aligned with the [API spec](./remote-cursor-agent-api-spec.md) types section.
 
 ```kotlin
 @Serializable
@@ -409,7 +409,7 @@ Design for **dark-first** with optional system theme sync. Liquid glass is decor
 
 ## MVP implementation order
 
-1. Shared DTOs + kotlinx.serialization (+ contract tests against server fixtures).
+1. Shared DTOs + kotlinx.serialization (aligned with API spec types).
 2. Ktor `RemoteAgentApi` + auth interceptor + error mapping.
 3. SSE reader with parse + flow collection.
 4. Settings screen (URL, tokens, connection test, biometric gate optional).
@@ -454,4 +454,3 @@ Android Studio on Windows is the primary IDE for this KMP client.
 ## Related docs
 
 - [Remote Cursor Agent API Spec](./remote-cursor-agent-api-spec.md)
-- Contract tests: `tests/kmp-spec-contract.test.ts`
